@@ -1,0 +1,664 @@
+```html
+<!DOCTYPE html>
+<html lang="he" dir="rtl" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>8 פלאי תבל - תלת ממד (גרסה מלאה עם תמונות)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #0f172a; touch-action: none; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;}
+        #canvas-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+        
+        #ui-panel {
+            position: absolute;
+            z-index: 50; 
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow-y: auto; 
+            box-shadow: 0 -10px 40px rgba(0,0,0,0.5);
+        }
+
+        @media (max-width: 767px) {
+            #ui-panel {
+                bottom: 0;
+                left: 0;
+                width: 100%;
+                height: 85vh;
+                border-top-left-radius: 28px;
+                border-top-right-radius: 28px;
+                transform: translateY(100%);
+            }
+            #ui-panel.open {
+                transform: translateY(0);
+            }
+            .wonder-label {
+                font-size: 14px;
+                padding: 4px 8px;
+            }
+        }
+
+        @media (min-width: 768px) {
+            #ui-panel {
+                top: 0;
+                right: 0;
+                width: 500px;
+                height: 100vh;
+                border-left: 1px solid rgba(255, 255, 255, 0.1);
+                transform: translateX(100%);
+                box-shadow: -10px 0 40px rgba(0,0,0,0.5);
+            }
+            #ui-panel.open {
+                transform: translateX(0);
+            }
+            .wonder-label {
+                font-size: 16px;
+                padding: 6px 12px;
+            }
+        }
+
+        .wonder-label {
+            position: absolute;
+            color: white;
+            background: rgba(15, 23, 42, 0.75);
+            border: 1px solid rgba(59, 130, 246, 0.5);
+            border-radius: 8px;
+            pointer-events: none;
+            user-select: none;
+            font-weight: bold;
+            white-space: nowrap;
+            text-shadow: 0px 2px 4px rgba(0,0,0,0.9);
+            z-index: 10; 
+            transition: opacity 0.3s ease;
+            opacity: 0.9;
+        }
+        
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 10px; }
+    </style>
+    
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body class="text-gray-100 selection:bg-blue-500 selection:text-white">
+
+    <div id="canvas-container"></div>
+    <div id="labels-container" class="absolute top-0 left-0 w-full h-full pointer-events-none z-10"></div>
+
+    <!-- הודעת פתיחה -->
+    <div id="intro-overlay" class="absolute top-12 left-1/2 transform -translate-x-1/2 z-30 bg-slate-800/80 backdrop-blur border border-blue-500/30 px-6 py-3 rounded-2xl shadow-2xl pointer-events-none transition-opacity duration-500 text-center w-[90%] md:w-auto">
+        <p class="text-base md:text-lg font-medium text-white">סובב את המרחב ולחץ על המודלים כדי לחקור את פלאי תבל</p>
+    </div>
+
+    <!-- פאנל צד/תחתון נגלל -->
+    <div id="ui-panel" class="p-6 md:p-8 relative">
+        
+        <button id="close-btn" class="absolute top-6 left-6 p-2 bg-slate-800/80 hover:bg-slate-700 rounded-full transition-colors z-20 backdrop-blur border border-slate-600 focus:outline-none">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+
+        <h1 id="wonder-title" class="text-3xl md:text-4xl font-bold text-blue-400 tracking-tight mb-5 ml-12">כותרת הפלא</h1>
+        
+        <!-- Image Container -->
+        <div id="image-container" class="relative w-full h-48 md:h-64 bg-slate-800 rounded-xl overflow-hidden flex flex-col items-center justify-center shadow-inner shrink-0 mb-6 transition-all duration-300">
+            <div id="image-placeholder" class="flex flex-col items-center justify-center w-full h-full">
+                <svg class="w-12 h-12 text-slate-400 mb-3 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                <p class="text-slate-300 font-medium text-center px-4">טוען תמונה...</p>
+            </div>
+            <!-- הוספתי כאן סמן לחיצה (cursor-pointer) ואפקט ריחוף -->
+            <img id="wonder-image" class="absolute inset-0 w-full h-full object-cover hidden cursor-pointer hover:opacity-90 transition-opacity" alt="Wonder Image" title="לחץ להגדלה" />
+        </div>
+
+        <!-- Detailed Info List -->
+        <div class="flex flex-col gap-5 pb-8 text-slate-200 text-base leading-relaxed">
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="bg-indigo-900/30 p-4 rounded-xl border border-indigo-700/50">
+                    <h3 class="text-indigo-300 font-semibold mb-1 flex items-center gap-2 text-sm">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                        א. כמות פועלים
+                    </h3>
+                    <p id="wonder-workers" class="text-sm text-indigo-100"></p>
+                </div>
+                
+                <div class="bg-green-900/30 p-4 rounded-xl border border-green-700/50">
+                    <h3 class="text-green-300 font-semibold mb-1 flex items-center gap-2 text-sm">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        ב. שכר הפועלים
+                    </h3>
+                    <p id="wonder-salary" class="text-sm text-green-100"></p>
+                </div>
+
+                <div class="bg-rose-900/30 p-4 rounded-xl border border-rose-700/50 md:col-span-2">
+                    <h3 class="text-rose-300 font-semibold mb-1 flex items-center gap-2 text-sm">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                        ג. עבור מי עבדו הפועלים
+                    </h3>
+                    <p id="wonder-employer" class="text-sm text-rose-100"></p>
+                </div>
+            </div>
+
+            <div class="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50 mt-2">
+                <h3 class="text-blue-300 font-semibold mb-2 flex items-center gap-2">
+                    1. אטימולוגיה מלאה ומפורקת
+                </h3>
+                <p id="wonder-etymology" class="text-sm space-y-1"></p>
+            </div>
+
+            <div class="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50">
+                <h3 class="text-emerald-300 font-semibold mb-2 flex items-center gap-2">
+                    2. שם הבונה
+                </h3>
+                <p id="wonder-builder" class="text-sm"></p>
+            </div>
+
+            <div class="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50">
+                <h3 class="text-amber-300 font-semibold mb-2 flex items-center gap-2">
+                    3. סיבת הבנייה
+                </h3>
+                    <p id="wonder-reason" class="text-sm"></p>
+            </div>
+
+            <div class="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50">
+                <h3 class="text-purple-300 font-semibold mb-2 flex items-center gap-2">
+                    4. שנת הבנייה
+                </h3>
+                <p id="wonder-years" class="text-sm"></p>
+            </div>
+
+            <div class="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50">
+                <h3 class="text-yellow-400 font-semibold mb-2 flex items-center gap-2">
+                    5. עלויות ומימון הפרויקט
+                </h3>
+                <p id="wonder-costs" class="text-sm"></p>
+            </div>
+
+            <div class="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50">
+                <h3 class="text-cyan-300 font-semibold mb-2 flex items-center gap-2">
+                    6. מפרט טכני
+                </h3>
+                <p id="wonder-specs" class="text-sm"></p>
+            </div>
+            
+            <p class="text-xs text-slate-500 text-center mt-4">* המקורות למידע מבוססים על מחקר היסטורי וארכיאולוגי מקובל.</p>
+        </div>
+    </div>
+
+    <!-- מודל החלון הצף (Lightbox) עבור התמונות -->
+    <div id="image-modal" class="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-sm flex items-center justify-center opacity-0 pointer-events-none transition-opacity duration-300 p-4 md:p-8">
+        <button id="modal-close-btn" class="absolute top-6 right-6 md:top-8 md:right-8 p-3 bg-slate-800/80 hover:bg-slate-700 rounded-full transition-colors backdrop-blur border border-slate-600 focus:outline-none z-10 text-white">
+            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+        <img id="modal-image" class="max-w-full max-h-full object-contain rounded-xl shadow-[0_0_50px_rgba(0,0,0,0.8)] border border-slate-700/50" alt="Full Wonder Image" />
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // --- Data Structure with Extensive Research and Image URLs ---
+        const wondersData = [
+            {
+                id: 'christ',
+                name: "פסל ישו הגואל",
+                imageUrl: "https://i.postimg.cc/PNF90TQ5/christ-the-redeemer.png",
+                workers: "מאות פועלים מקומיים, סתתים, מהנדסים ואומנים ברזילאים.",
+                salary: "הפועלים קיבלו שכר עבודה יומי או קבלני בהתאם לשכר הממוצע בברזיל באותה תקופה. העבודה לא נעשתה על ידי עבדים אלא על ידי עובדים שכירים ומתנדבים מטעם הכנסייה.",
+                employer: "הפועלים עבדו עבור 'החוג הקתולי של ריו דה ז'נרו' (הגוף שיזם ומימן את הפרויקט), תחת פיקוחו הישיר של המהנדס הראשי הייטור דה סילבה קוסטה.",
+                etymology: "<b>אטימולוגיה מפורקת:</b><br/>• <b>ישו (Jesus):</b> מיוונית 'Iesous', שמקורה בארמית/עברית 'ישוע', השם המקורי של הדמות ההיסטורית.<br/>• <b>הגואל (The Redeemer):</b> תואר תיאולוגי נוצרי המתייחס להצלת האנושות. במקור מפורטוגזית: 'Cristo Redentor' (קריסטו רדנטור).",
+                builder: "הפסל הצרפתי-פולני פול לנדובסקי, המהנדס הברזילאי הייטור דה סילבה קוסטה, והמהנדס הצרפתי אלברט קאקו.",
+                reason: "הבנייה יצאה לדרך כסמל להתעוררות דתית קתולית במדינה, ועל מנת לציין את חגיגות 100 שנות עצמאות לברזיל. המטרה הייתה ליצור סמל נוצרי אדיר שישקיף על העיר.",
+                years: "תחילת הבנייה: 1922.<br/>סיום וחנוכת הפסל: 12 באוקטובר 1931.<br/>סה\"כ: 9 שנות עבודה.",
+                costs: "כ-250,000 דולר במונחי שנת 1931. סכום זה שווה ערך לכ-4.3 מיליון דולר במונחים של ימינו. המימון הושג כמעט במלואו מתרומות של הקהילה הקתולית.",
+                specs: "• <b>גובה:</b> 30 מטרים (בנוסף ל-8 מטרים של בסיס/כן).<br/>• <b>מוטת ידיים:</b> 28 מטרים.<br/>• <b>משקל הפסל:</b> כ-635 טון.<br/>• <b>חומרי בנייה:</b> שלד פנימי מסיבי עשוי מבטון מזוין, והמעטפת החיצונית מורכבת מכ-6 מיליון אריחים משולשים של סבון-אבן (Soapstone).",
+                color: 0xe2e8f0,
+                createGroup: (mat) => {
+                    const group = new THREE.Group();
+                    const body = new THREE.Mesh(new THREE.BoxGeometry(0.8, 3.5, 0.6), mat);
+                    body.position.y = 1.75;
+                    const arms = new THREE.Mesh(new THREE.BoxGeometry(3, 0.6, 0.5), mat);
+                    arms.position.y = 2.8;
+                    const base = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 0.5, 16), mat);
+                    base.position.y = 0.25;
+                    group.add(body, arms, base);
+                    return group;
+                }
+            },
+            {
+                id: 'tajmahal',
+                name: "טאג' מהאל",
+                imageUrl: "https://i.postimg.cc/dD0gWLdz/taj-mahal.png",
+                workers: "למעלה מ-20,000 אומנים, פועלים, סתתי אבן, קליגרפים ומומחים מכל רחבי הודו, פרס, והאימפריה העות'מאנית.",
+                salary: "הפועלים קיבלו שכר יומי. בנוסף לשכר, נבנתה עבורם עיירה שלמה למגורים בשם 'מומתאזאבאד' שבה סיפקו להם מזון ותנאי מחיה בזמן הבנייה.",
+                employer: "עבדו ישירות עבור שאה ג'האן, הקיסר המוגולי של הודו, ונוהלו על ידי מועצת אדריכלים קיסרית בראשות אוסטאד אחמד לאהורי.",
+                etymology: "<b>אטימולוגיה מפורקת:</b><br/>• <b>טאג' (Taj):</b> מקורו בשפה הפרסית, ופירושו 'כתר'.<br/>• <b>מהאל (Mahal):</b> מקורו בערבית/פרסית, ופירושו 'מקום', 'אזור', או 'ארמון'.<br/>• משמעות מלאה: 'כתר הארמון'. על שם אשתו של הקיסר, מומתאז מהאל.",
+                builder: "הקיסר המוגולי שאה ג'האן (1592-1666).",
+                reason: "הוקם כמאוזוליאום (מבנה קבר) מפואר וסמל של אהבה נצחית לאשתו השלישית והאהובה ביותר של הקיסר, מומתאז מהאל.",
+                years: "תחילת הבנייה: 1632.<br/>השלמת המבנה המרכזי: 1643.<br/>סיום מתחם הגנים והמבנים ההיקפיים: 1653.<br/>סה\"כ: 21 שנות בנייה.",
+                costs: "העלות ההיסטורית מוערכת בכ-32 מיליון רופי אינדיאני של אותה תקופה. מוערך בכ-1 מיליארד דולר אמריקאי כיום.",
+                specs: "• <b>גובה הכיפה המרכזית:</b> 73 מטרים.<br/>• <b>חומרי בנייה:</b> ליבת לבנים בחיפוי שיש לבן ובוהק מראג'סטאן, משובץ ב-28 סוגים של אבנים יקרות וחצי-יקרות.<br/>• <b>סגנון:</b> שילוב מופתי של אדריכלות מוגולית, איסלאמית, פרסית והודית.",
+                color: 0xffffff,
+                createGroup: (mat) => {
+                    const group = new THREE.Group();
+                    const base = new THREE.Mesh(new THREE.BoxGeometry(3, 1, 3), mat);
+                    base.position.y = 0.5;
+                    const dome = new THREE.Mesh(new THREE.SphereGeometry(0.8, 16, 16), mat);
+                    dome.position.y = 1.8;
+                    const domeBase = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 0.5, 16), mat);
+                    domeBase.position.y = 1.25;
+                    group.add(base, dome, domeBase);
+                    [[-1.3,-1.3], [1.3,-1.3], [-1.3,1.3], [1.3,1.3]].forEach(pos => {
+                        const minaret = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 2.5, 8), mat);
+                        minaret.position.set(pos[0], 1.25, pos[1]);
+                        group.add(minaret);
+                    });
+                    return group;
+                }
+            },
+            {
+                id: 'colosseum',
+                name: "הקולוסיאום",
+                imageUrl: "https://i.postimg.cc/HjLFSVXk/colosseum.png",
+                workers: "בין 60,000 ל-100,000 פועלים. רובם המוחלט היו עבדים ושבויים יהודים שהובאו לרומא לאחר המרד הגדול, לצד מהנדסים ומומחי אבן רומאים.",
+                salary: "העבדים והשבויים היהודים לא קיבלו שכר כלל, אלא רק מנות מזון קיומיות (כפייה). לעומתם, המהנדסים, האדריכלים והבנאים המומחים הרומאים קיבלו שכר מלא מהקופה הקיסרית.",
+                employer: "הפועלים עבדו עבור האימפריה הרומית, תחת שלטון השושלת הפלאבית (הקיסר אספסיאנוס וטיטוס בנו).",
+                etymology: "<b>אטימולוגיה מפורקת:</b><br/>• <b>שם מקורי:</b> האמפיתיאטרון הפלאבי (Amphitheatrum Flavium), על שם השושלת.<br/>• <b>קולוסיאום (Colosseum):</b> מהמילה הלטינית 'Colosseus' (עצום, אדיר). אומץ בגלל פסל ברונזה ענק ('הקולוסוס של נירון') שניצב בסמוך אליו.",
+                builder: "הקיסר אספסיאנוס (9-79 לספירה), בנו הקיסר טיטוס (39-81 לספירה), והקיסר דומיטיאנוס.",
+                reason: "מבנה בידור אדיר שנועד לשמש זירה לקרבות גלדיאטורים, ולשחזור קרבות פומביים. מטרתו הפוליטית הייתה להחזיר את השטחים הציבוריים לעם (על חורבות ארמונו של נירון).",
+                years: "תחילת הבנייה: שנת 70-72 לספירה.<br/>חנוכת המבנה: שנת 80 לספירה.<br/>סה\"כ: כ-8 עד 10 שנות בנייה.",
+                costs: "מומן באמצעות אוצרות השלל העצומים שנבזזו מבית המקדש השני בירושלים.",
+                specs: "• <b>מידות:</b> מבנה אליפטי. אורך 189 מטר, רוחב 156 מטר, גובה החזית החיצונית 48 מטר.<br/>• <b>קיבולת:</b> בין 50,000 ל-80,000 צופים.<br/>• <b>חומרי בנייה:</b> כ-100,000 מטר מעוקב של אבן טרוורטין, בטון רומאי, וטוף.",
+                color: 0xdeb887,
+                createGroup: (mat) => {
+                    const group = new THREE.Group();
+                    const arena = new THREE.Mesh(new THREE.TorusGeometry(1.5, 0.8, 16, 64), mat);
+                    arena.rotation.x = Math.PI / 2;
+                    const base = new THREE.Mesh(new THREE.CylinderGeometry(2.3, 2.3, 0.2, 32), mat);
+                    base.position.y = -0.8;
+                    group.add(arena, base);
+                    return group;
+                }
+            },
+            {
+                id: 'petra',
+                name: "פטרה",
+                imageUrl: "https://i.postimg.cc/14zbWf6k/petra-al-khazneh-treasury.png",
+                workers: "אלפי סתתים, חוצבים ואדריכלים נבטים שהיו מומחים בחציבה בסלע, יחד עם פועלי דחק שעזרו בפינוי הריסות האבן.",
+                salary: "חברת הנבטים הייתה עשירה מאוד ממסחר. הפועלים המומחים (סתתים) קיבלו שכר הוגן וגבוה מקופת הממלכה או מתשלומי גילדות. לא ידוע על שימוש נרחב בעבדות לבניית החזיתות המונומנטליות.",
+                employer: "הפועלים עבדו עבור המלוכה הנבטית (כגון המלך חרתת הרביעי) ועבור משפחות אצולה עשירות שהזמינו אחוזות קבר.",
+                etymology: "<b>אטימולוגיה מפורקת:</b><br/>• <b>פטרה (Petra):</b> מקור השם בשפה היוונית (πέτρα), ופירושו פשוט 'סלע' או 'אבן'. בערבית היא נקראת 'אל-בטרא'.<br/>• <b>השם המקורי:</b> ממצאים אפיגרפיים מצביעים על כך שהנבטים קראו לעיר 'רקם' או 'רקומו'.",
+                builder: "נבנתה על ידי הנבטים – שבט נוודים ערבי שהקים אימפריית סחר משגשגת.",
+                reason: "שימשה כעיר בירתם של הנבטים, מרכז אסטרטגי לשליטה על 'דרך הבשמים', ומרכז אדיר לקבורה מלכותית ופולחן דתי.",
+                years: "ייסוד העיר: מוערך סביב המאה ה-4 לפנה\"ס.<br/>שיא הפריחה והחציבה בסלע: המאה ה-1 לפנה\"ס עד המאה ה-1 לספירה.",
+                costs: "העיר מומנה כולה מהעושר העצום שהנבטים צברו מגביית מיסים ומתן שירותי אבטחה לשיירות המסחר שחצו את המדבר.",
+                specs: "• <b>טכניקת חציבה:</b> העיר חצובה מלמעלה למטה ישירות לתוך צוקי אבן חול אדומה.<br/>• <b>האוצר (אל-חזנה):</b> חזית בגובה 39 מטר ורוחב 24 מטר.<br/>• <b>מערכת המים:</b> מערכת סכרים, צינורות חרס, ואמות מים חצובות שאפשרו לקיים עיר של 20,000 תושבים בלב המדבר.",
+                color: 0xcd5c5c,
+                createGroup: (mat) => {
+                    const group = new THREE.Group();
+                    const facade = new THREE.Mesh(new THREE.BoxGeometry(2.5, 3.5, 0.5), mat);
+                    facade.position.y = 1.75;
+                    const door = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.5, 0.6), new THREE.MeshStandardMaterial({color: 0x220000}));
+                    door.position.y = 0.75;
+                    door.position.z = 0.1;
+                    group.add(facade, door);
+                    return group;
+                }
+            },
+            {
+                id: 'machupicchu',
+                name: "מאצ'ו פיצ'ו",
+                imageUrl: "https://i.postimg.cc/QVnwvhJX/machu-picchu.png",
+                workers: "הערכות מצביעות על כ-4,000 עד 5,000 פועלים, שכללו מומחי אדריכלות, סתתים, ואזרחים שגויסו לעבודה פיזית מטעם המדינה.",
+                salary: "כלכלת האינקה לא כללה כסף או מטבעות. הפועלים לא קיבלו שכר כספי, אלא עבדו בשיטת ה'מיטה' (Mit'a) - חובת שירות ציבורי למדינה. בתמורה לעבודתם, האימפריה סיפקה להם מזון, מגורים, ביגוד ובירה מסורתית (צ'יצ'ה).",
+                employer: "הפועלים עבדו ישירות עבור האימפריה של האינקה, ובפרט עבור הקיסר פאצ'אקוטי יופאנקי שזה היה האחוזה הפרטית שלו.",
+                etymology: "<b>אטימולוגיה מפורקת:</b><br/>• מקור השם משפת ה'קצ'ואה' (Quechua).<br/>• <b>מאצ'ו (Machu):</b> פירושו 'ישן', 'עתיק' או 'בוגר'.<br/>• <b>פיצ'ו (Picchu):</b> פירושו 'פסגה', 'הר' או 'פירמידה'.<br/>• משמעות מלאה: 'הפסגה העתיקה' או 'ההר הישן'.",
+                builder: "אימפריית האינקה, תחת שלטונו של הקיסר פאצ'אקוטי יופאנקי (חי בשנים 1418-1471).",
+                reason: "האתר שימש ככל הנראה כאחוזה מלכותית פרטית של הקיסר, אתר נופש מבודד, ומרכז פולחן דתי-רוחני ומצפה אסטרונומי.",
+                years: "תחילת הבנייה: שנת 1450 לספירה בקירוב.<br/>נטישת האתר: שנת 1572 בקירוב, בעקבות הכיבוש הספרדי (הספרדים מעולם לא גילו את האתר).",
+                costs: "כאמור, הפרויקט לא דרש מימון כספי מודרני, אלא התבסס על כלכלת משאבים וגיוס כוח אדם חובה מהשבטים הכבושים.",
+                specs: "• <b>מיקום:</b> רכס האנדים, פרו. גובה 2,430 מטר מעל פני הים.<br/>• <b>טכניקת בנייה (Ashlar):</b> אבני גרניט ענקיות החתוכות ומותאמות בצורה כה מדויקת זו לזו עד שנבנו ללא טיט, מה שהפך אותן לעמידות בפני רעידות אדמה.<br/>• <b>חקלאות:</b> למעלה מ-700 טרסות חקלאיות מתוחכמות.",
+                color: 0x556b2f,
+                createGroup: (mat) => {
+                    const group = new THREE.Group();
+                    const b1 = new THREE.Mesh(new THREE.BoxGeometry(3, 0.6, 3), mat);
+                    b1.position.y = 0.3;
+                    const b2 = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.6, 2.2), mat);
+                    b2.position.y = 0.9;
+                    const b3 = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.6, 1.2), mat);
+                    b3.position.y = 1.5;
+                    group.add(b1, b2, b3);
+                    return group;
+                }
+            },
+            {
+                id: 'chichenitza',
+                name: "צ'יצ'ן איצה",
+                imageUrl: "https://i.postimg.cc/fkgp1DfM/chichen-itza.png",
+                workers: "עשרות אלפי אזרחים בני המאיה, איכרים (שעבדו בעונות היבשות כשלא עסקו בחקלאות), ושבויים/עבדים משבטים יריבים.",
+                salary: "אזרחי המאיה לא קיבלו שכר כספי עבור העבודה, אלא ביצעו אותה כחלק מתשלום מיסים (מס עבודה/מעשר) לאצולה ולכוהנים. בתמורה קיבלו קצבאות מזון והגנה. העבדים והשבויים כמובן עבדו ללא כל תמורה ובתנאי מחיה קשים.",
+                employer: "הפועלים עבדו עבור האצולה השלטת, המלכים, וכוהני הדת של שבט ה'איצה' (Itza) ששלט בעיר.",
+                etymology: "<b>אטימולוגיה מפורקת:</b><br/>• מקור השם משפת המאיה (Yucatec Maya).<br/>• <b>צ'י (Chi):</b> פירושו 'פי' או 'קצה'.<br/>• <b>צ'ן (Chen):</b> פירושו 'באר' או 'מעיין' (הכוונה לבולעני מים).<br/>• <b>איצה (Itza):</b> שמו של השבט הדומיננטי. פירושו 'מכשפי המים'.<br/>• משמעות מלאה: 'בפי הבאר של שבט האיצה'.",
+                builder: "עמי תרבות המאיה, בשילוב השפעות משמעותיות מאוחרות יותר של תרבות הטולטקים.",
+                reason: "שימשה כאחת מהערים הגדולות והחשובות ביותר בחצי האי יוקטן. הייתה מרכז פוליטי, כלכלי, ודתי שבו התקיימו טקסי קורבן לאלי הגשם.",
+                years: "ייסוד והתפתחות העיר: שנת 600 עד 1200 לספירה.<br/>הפירמידה המפורסמת (אל קסטיו) נבנתה סביב המאות ה-9 עד ה-12 לספירה.",
+                costs: "הכלכלה ומימון המשאבים התבססו על מסחר ענף במוצרים יקרי ערך כמו קולי פולי קקאו, ענבר, כותנה וירוקן.",
+                specs: "• <b>פירמידת אל-קסטיו:</b> פירמידת מדרגות בגובה 30 מטר (כולל המקדש).<br/>• <b>אסטרונומיה:</b> בפירמידה 4 גרמי מדרגות, 91 מדרגות בכל אחד. סה\"כ 365 – מספר ימות השנה.<br/>• <b>אפקט חזותי:</b> בימי השוויון, נוצרת אשליה אופטית של צל דמוי נחש הזוחל במורד המדרגות.",
+                color: 0x8b4513,
+                createGroup: (mat) => {
+                    const group = new THREE.Group();
+                    const pyramid = new THREE.Mesh(new THREE.ConeGeometry(1.8, 2, 4), mat);
+                    pyramid.position.y = 1;
+                    pyramid.rotation.y = Math.PI / 4;
+                    const temple = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.6, 0.8), mat);
+                    temple.position.y = 2.3;
+                    group.add(pyramid, temple);
+                    return group;
+                }
+            },
+            {
+                id: 'greatwall',
+                name: "החומה הסינית",
+                imageUrl: "https://i.postimg.cc/MXGgsvRg/great-wall-of-china.png",
+                workers: "המספרים עצומים: מאות אלפים עד מעל למיליון פועלים בכל תקופת בנייה משמעותית. כוח העבודה הורכב מחיילים בצבא הקיסרי, איכרים שגויסו בכפייה, ואסירים.",
+                salary: "חיילים קיבלו משכורות צבאיות רגילות. איכרים ואסירים (שהיו רוב כוח העבודה בעבודות הכפיים הקשות) לא קיבלו שכר כלל, אלא רק מנות אורז דלות להישרדות. רבים מהם מתו מתשישות ורעב ונקברו בקרבת החומה.",
+                employer: "הקיסרות הסינית לאורך השושלות השונות (החל מקיסר צ'ין הראשון, ועד קיסרי שושלת מינג).",
+                etymology: "<b>אטימולוגיה מפורקת:</b><br/>• בסינית: 万里长城 (Wànlǐ Chángchéng).<br/>• <b>וואן (Wàn / 万):</b> המספר 10,000, ביטוי סיני המייצג ריבוי או אינסוף.<br/>• <b>לי (lǐ / 里):</b> יחידת מידת מרחק (כ-500 מטר).<br/>• <b>צ'אנג (Cháng / 长):</b> ארוך.<br/>• <b>צ'נג (chéng / 城):</b> חומה.<br/>• משמעות מלאה: 'החומה הארוכה בת עשרת אלפים הלי'.",
+                builder: "נבנתה על ידי מספר שושלות לאורך ההיסטוריה. המאמץ המאורגן הראשון החל תחת הקיסר צ'ין שי חואנג, וחלקה המוכר כיום נבנה על ידי שושלת מינג.",
+                reason: "מערכת הגנה וביצור אסטרטגית שנועדה למנוע פלישות של שבטים נוודים מצפון (כמו המונגולים), לשלוט בהגירה, ולפקח על המסחר לאורך 'דרך המשי'.",
+                years: "תחילת הבנייה: המאה ה-7 לפנה\"ס (חיבור חומות אזוריות).<br/>תום תקופת הבנייה המסיבית: 1644 לספירה (נפילת שושלת מינג).<br/>סה\"כ: למעלה מ-2,000 שנות בנייה הנדסית.",
+                costs: "העלות האנושית הייתה עצומה, והמחיר הכלכלי של החומרים ותחזוקת הצבא לאורך החומה רושש לעיתים קרובות את קופת הקיסרות.",
+                specs: "• <b>אורך כולל:</b> כ-21,196 קילומטרים (לפי מדידות מודרניות).<br/>• <b>מידות ממוצעות (מינג):</b> גובה 5-8 מטרים, רוחב בסיס כ-6.5 מטרים.<br/>• <b>חומרי בנייה:</b> אדמה נגוחה ועץ בתקופות קדומות. בתקופת מינג: מיליוני לבנים שרופות, גרניט, וטיט שהכיל קמח אורז דביק לחוזק.",
+                color: 0x696969,
+                createGroup: (mat) => {
+                    const group = new THREE.Group();
+                    const wall = new THREE.Mesh(new THREE.BoxGeometry(4.5, 1, 0.8), mat);
+                    wall.position.y = 0.5;
+                    const tower1 = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.8, 1.2), mat);
+                    tower1.position.set(-1.5, 0.9, 0);
+                    const tower2 = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.8, 1.2), mat);
+                    tower2.position.set(1.5, 0.9, 0);
+                    group.add(wall, tower1, tower2);
+                    return group;
+                }
+            },
+            {
+                id: 'pyramid',
+                name: "הפירמידה הגדולה של גיזה",
+                imageUrl: "https://i.postimg.cc/hhGNCfTF/great-pyramid-of-giza.png",
+                workers: "הערכות מודרניות מצביעות על כ-20,000 עד 30,000 פועלים, מתכננים וסתתים שעבדו בזמן נתון.",
+                salary: "בניגוד למיתוס, הפירמידה לא נבנתה על ידי עבדים אלא על ידי איכרים אזרחי מצרים שגויסו בתקופת הצפת הנילוס. שכרם ניתן במנות מזון נדיבות (בשר, לחם מובחר ובירה), דיור, טיפול רפואי מתקדם לתקופה ופטור ממיסים.",
+                employer: "הפועלים עבדו ישירות עבור מדינת מצרים ופרעה ח'ופו עצמו, שנחשב בדת המצרית לאל חי עלי אדמות.",
+                etymology: "<b>אטימולוגיה מפורקת:</b><br/>• <b>פירמידה (Pyramid):</b> מיוונית 'Pyramis', כנראה נגזר מהמצרית הקדומה 'Per-em-us' ('מה שעולה למעלה').<br/>• <b>גיזה (Giza):</b> מיקום הרמה במצרים.<br/>• <b>ח'ופו (Khufu):</b> שמו של הפרעה שעבורו נבנתה (מכונה ביוונית 'כאופס').",
+                builder: "פרעה ח'ופו (הקיסר השני של השושלת ה-4). האדריכל הראשי המיוחס להקמתה הוא אחיינו ויועצו, המיאונו (Hemiunu).",
+                reason: "נבנתה כקבר מלכותי (מאוזוליאום) עצום שנועד לשמור על גופתו של הפרעה ולאפשר את המעבר של נשמתו לחיי הנצח ואל האלים, תוך הפגנת עוצמה שלטונית-אלוהית מוחלטת.",
+                years: "תחילת הבנייה: סביב שנת 2560 לפנה\"ס.<br/>סיום הבנייה: כ-2540 לפנה\"ס.<br/>סה\"כ: כ-20 שנות בנייה מואצת.",
+                costs: "אין נתון כספי היסטורי בעולם של סחר חליפין. עם זאת, כלכלנים והנדסאים מעריכים שעלות בנייה שכזו כיום, כולל שינוע המשאבים האדיר וכוח האדם, הייתה מגיעה לכ-5 מיליארד דולר.",
+                specs: "• <b>גובה מקורי:</b> 146.6 מטרים (הגבוה בעולם במשך 3,800 שנה).<br/>• <b>אורך בסיס:</b> 230.4 מטרים לכל צלע.<br/>• <b>משקל מוערך:</b> כ-5.9 מיליון טון.<br/>• <b>חומרי בנייה:</b> מורכבת מכ-2.3 מיליון גושי אבן גיר וגרניט עצומים. במקור חופתה באבן גיר בוהקת (Tura limestone) שהחזירה את אור השמש למרחקים.",
+                color: 0xcdaa7d, 
+                createGroup: (mat) => {
+                    const group = new THREE.Group();
+                    const pyramid = new THREE.Mesh(new THREE.ConeGeometry(2.5, 3.5, 4), mat);
+                    pyramid.position.y = 1.75;
+                    pyramid.rotation.y = Math.PI / 4;
+                    group.add(pyramid);
+                    return group;
+                }
+            }
+        ];
+
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x0f172a, 0.02); 
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 12, 20); 
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); 
+        document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+        scene.add(ambientLight);
+        
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
+        directionalLight.position.set(10, 20, 10);
+        scene.add(directionalLight);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.autoRotate = true;
+        controls.autoRotateSpeed = 0.4;
+        controls.maxDistance = 45;
+        controls.minDistance = 5;
+
+        const objects = [];
+        const radius = 10.5; 
+        const labelsContainer = document.getElementById('labels-container');
+
+        wondersData.forEach((wonder, index) => {
+            const material = new THREE.MeshStandardMaterial({ 
+                color: wonder.color,
+                roughness: 0.5,
+                metalness: 0.1,
+            });
+
+            const wonderGroup = wonder.createGroup(material);
+            
+            const angle = (index / wondersData.length) * Math.PI * 2;
+            wonderGroup.position.x = Math.cos(angle) * radius;
+            wonderGroup.position.z = Math.sin(angle) * radius;
+            wonderGroup.position.y = (Math.random() - 0.5) * 2; 
+            
+            wonderGroup.userData = wonder;
+            
+            wonderGroup.children.forEach(child => {
+                child.userData = { parentWonder: wonderGroup };
+            });
+
+            scene.add(wonderGroup);
+            objects.push({ group: wonderGroup, basePositionY: wonderGroup.position.y, timeOffset: Math.random() * 100 });
+
+            const label = document.createElement('div');
+            label.className = 'wonder-label';
+            label.textContent = wonder.name;
+            label.id = `label-${wonder.id}`;
+            labelsContainer.appendChild(label);
+            wonderGroup.userData.labelElement = label;
+        });
+
+        const centerHelper = new THREE.Mesh(new THREE.SphereGeometry(0.1), new THREE.MeshBasicMaterial({visible: false}));
+        scene.add(centerHelper);
+
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        let pointerDownPos = { x: 0, y: 0 };
+        let isPanelOpen = false;
+        let selectedWonder = null;
+
+        const introOverlay = document.getElementById('intro-overlay');
+
+        renderer.domElement.addEventListener('pointerdown', (event) => {
+            pointerDownPos.x = event.clientX;
+            pointerDownPos.y = event.clientY;
+            
+            if(introOverlay.style.opacity !== '0') {
+                introOverlay.style.opacity = '0';
+            }
+        });
+
+        renderer.domElement.addEventListener('pointerup', (event) => {
+            const dist = Math.hypot(event.clientX - pointerDownPos.x, event.clientY - pointerDownPos.y);
+            if (dist > 10) return; 
+
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+
+            let allMeshes = [];
+            objects.forEach(obj => {
+                allMeshes = allMeshes.concat(obj.group.children);
+            });
+
+            const intersects = raycaster.intersectObjects(allMeshes);
+
+            if (intersects.length > 0) {
+                const clickedMesh = intersects[0].object;
+                const wonderGroup = clickedMesh.userData.parentWonder;
+                
+                if(wonderGroup && wonderGroup.userData) {
+                    handleWonderClick(wonderGroup.userData);
+                    
+                    wonderGroup.children.forEach(child => {
+                        if(child.material) {
+                            const currentEmissive = child.material.emissive.getHex();
+                            child.material.emissive.setHex(0x555555);
+                            setTimeout(() => { child.material.emissive.setHex(currentEmissive); }, 300);
+                        }
+                    });
+                }
+            }
+        });
+
+        const uiPanel = document.getElementById('ui-panel');
+        const closeBtn = document.getElementById('close-btn');
+
+        closeBtn.addEventListener('click', () => {
+            uiPanel.classList.remove('open');
+            isPanelOpen = false;
+            controls.autoRotate = true;
+        });
+
+        const handleWonderClick = (data) => {
+            if (selectedWonder?.id === data.id && isPanelOpen) return;
+            
+            selectedWonder = data;
+            isPanelOpen = true;
+
+            document.getElementById('wonder-title').textContent = data.name;
+            document.getElementById('wonder-workers').textContent = data.workers;
+            document.getElementById('wonder-salary').textContent = data.salary;
+            document.getElementById('wonder-employer').textContent = data.employer;
+            document.getElementById('wonder-etymology').innerHTML = data.etymology;
+            document.getElementById('wonder-builder').innerHTML = data.builder;
+            document.getElementById('wonder-reason').innerHTML = data.reason;
+            document.getElementById('wonder-years').innerHTML = data.years;
+            document.getElementById('wonder-costs').innerHTML = data.costs;
+            document.getElementById('wonder-specs').innerHTML = data.specs;
+
+            const imageImg = document.getElementById('wonder-image');
+            const imagePlaceholder = document.getElementById('image-placeholder');
+            const imageContainer = document.getElementById('image-container');
+
+            imageImg.classList.add('hidden');
+            imagePlaceholder.style.display = 'flex';
+            imageContainer.classList.add('border-dashed', 'border-2', 'border-slate-500');
+
+            imageImg.src = data.imageUrl;
+            imageImg.onload = () => {
+                imageImg.classList.remove('hidden');
+                imagePlaceholder.style.display = 'none';
+                imageContainer.classList.remove('border-dashed', 'border-2', 'border-slate-500');
+            };
+
+            uiPanel.scrollTop = 0;
+            uiPanel.classList.add('open');
+            controls.autoRotate = false;
+        };
+
+        // --- לוגיקת החלון הצף (Modal) עבור התמונות ---
+        const imageModal = document.getElementById('image-modal');
+        const modalImage = document.getElementById('modal-image');
+        const modalCloseBtn = document.getElementById('modal-close-btn');
+        const wonderImageThumbnail = document.getElementById('wonder-image');
+
+        // פתיחת החלון כשלוחצים על התמונה בפאנל
+        wonderImageThumbnail.addEventListener('click', () => {
+            modalImage.src = wonderImageThumbnail.src;
+            imageModal.classList.remove('opacity-0', 'pointer-events-none');
+        });
+
+        // פונקציית סגירת החלון
+        const closeModal = () => {
+            imageModal.classList.add('opacity-0', 'pointer-events-none');
+            // מרוקן את התמונה רק אחרי סיום האנימציה כדי שלא תעלם בפתאומיות
+            setTimeout(() => { modalImage.src = ''; }, 300);
+        };
+
+        // סגירה בלחיצה על כפתור ה-X
+        modalCloseBtn.addEventListener('click', closeModal);
+        
+        // סגירה בלחיצה על הרקע הכהה מסביב לתמונה
+        imageModal.addEventListener('click', (e) => {
+            if (e.target === imageModal) {
+                closeModal();
+            }
+        });
+
+        const clock = new THREE.Clock();
+
+        const animate = () => {
+            requestAnimationFrame(animate);
+            const elapsedTime = clock.getElapsedTime();
+
+            objects.forEach(obj => {
+                obj.group.rotation.x += 0.005;
+                obj.group.rotation.y += 0.005;
+                obj.group.position.y = obj.basePositionY + Math.sin(elapsedTime * 2 + obj.timeOffset) * 0.5;
+
+                const vector = obj.group.position.clone();
+                vector.project(camera);
+
+                if (vector.z > 1 || isPanelOpen) {
+                    obj.group.userData.labelElement.style.opacity = '0';
+                    obj.group.userData.labelElement.style.pointerEvents = 'none';
+                } else {
+                    obj.group.userData.labelElement.style.display = 'block';
+                    obj.group.userData.labelElement.style.opacity = '0.9';
+                    
+                    const x = (vector.x * .5 + .5) * window.innerWidth;
+                    const y = (vector.y * -.5 + .5) * window.innerHeight;
+                    
+                    obj.group.userData.labelElement.style.transform = `translate(-50%, -50%) translate(${x}px, ${y - 40}px)`;
+                }
+            });
+
+            controls.update();
+            renderer.render(scene, camera);
+        };
+
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+    </script>
+</body>
+</html>
+
+```
