@@ -91,9 +91,8 @@
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #475569; border-radius: 10px; }
 
-        /* הגדרות נוספות כדי לאפשר זום חלק בחלון הצף */
         #modal-image {
-            touch-action: none; /* חוסם את התנהגות הדפדפן כדי לאפשר לסקריפט שלנו להשתלט */
+            touch-action: none; 
             transform-origin: center center;
             will-change: transform;
         }
@@ -113,6 +112,10 @@
     <div id="canvas-container"></div>
     <div id="labels-container" class="absolute top-0 left-0 w-full h-full pointer-events-none z-10"></div>
 
+    <a href="index_en.html" class="absolute top-6 left-6 z-40 bg-slate-800/80 hover:bg-slate-700 text-white font-medium py-2 px-4 rounded-full backdrop-blur border border-slate-600 transition-colors shadow-lg flex items-center gap-2 text-sm">
+        <span>🌐</span> EN
+    </a>
+
     <div id="intro-overlay" class="absolute top-12 left-1/2 transform -translate-x-1/2 z-30 bg-slate-800/80 backdrop-blur border border-blue-500/30 px-6 py-3 rounded-2xl shadow-2xl pointer-events-none transition-opacity duration-500 text-center w-[90%] md:w-auto">
         <p class="text-base md:text-lg font-medium text-white">סובב את המרחב ולחץ על המודלים כדי לחקור את פלאי תבל</p>
     </div>
@@ -123,7 +126,7 @@
             <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>
 
-        <h1 id="wonder-title" class="text-3xl md:text-4xl font-bold text-blue-400 tracking-tight mb-5 ml-12">כותרת הפלא</h1>
+        <h1 id="wonder-title" class="text-3xl md:text-4xl font-bold text-blue-400 tracking-tight mb-5 ml-12 mt-10 md:mt-0">כותרת הפלא</h1>
         
         <div id="image-container" class="relative w-full h-48 md:h-64 bg-slate-800 rounded-xl overflow-hidden flex flex-col items-center justify-center shadow-inner shrink-0 mb-6 transition-all duration-300">
             <div id="image-placeholder" class="flex flex-col items-center justify-center w-full h-full">
@@ -217,7 +220,7 @@
         
         <img id="modal-image" class="max-w-full max-h-full object-contain rounded-lg shadow-2xl relative z-10" alt="Full Wonder Image" />
         
-        <div id="zoom-hint" class="absolute bottom-10 left-1/2 transform -translate-x-1/2 bg-black/60 text-white px-4 py-2 rounded-full text-sm font-medium z-[110] pointer-events-none transition-opacity duration-500">
+        <div id="zoom-hint" class="absolute bottom-10 left-1/2 transform -translate-x-1/2 bg-black/60 text-white px-4 py-2 rounded-full text-sm font-medium z-[110] pointer-events-none transition-opacity duration-500 whitespace-nowrap">
             ניתן ללחוץ פעמיים או לצבוט להגדלה
         </div>
     </div>
@@ -597,7 +600,6 @@
             controls.autoRotate = false;
         };
 
-        // --- לוגיקת החלון הצף (Modal) והזום המותאם אישית (Pinch & Pan) ---
         const imageModal = document.getElementById('image-modal');
         const modalImage = document.getElementById('modal-image');
         const modalCloseBtn = document.getElementById('modal-close-btn');
@@ -645,9 +647,8 @@
         modalCloseBtn.addEventListener('click', closeModal);
         modalBackground.addEventListener('click', closeModal);
 
-        // מנוע המגע: צביטה, גרירה ולחיצה כפולה
         modalImage.addEventListener('touchstart', (e) => {
-            zoomHint.style.opacity = '0'; // מעלים את ההדרכה
+            zoomHint.style.opacity = '0'; 
             if (e.touches.length === 1) {
                 isDragging = true;
                 startX = e.touches[0].clientX - currentX;
@@ -663,7 +664,7 @@
         }, { passive: false });
 
         modalImage.addEventListener('touchmove', (e) => {
-            e.preventDefault(); // חוסם גלילה של האתר עצמו
+            e.preventDefault(); 
             if (e.touches.length === 1 && isDragging && currentScale > 1) {
                 currentX = e.touches[0].clientX - startX;
                 currentY = e.touches[0].clientY - startY;
@@ -674,7 +675,7 @@
                     e.touches[0].clientY - e.touches[1].clientY
                 );
                 const scaleFactor = currentDistance / initialPinchDistance;
-                currentScale = Math.max(1, Math.min(initialScale * scaleFactor, 5)); // זום מקסימלי x5
+                currentScale = Math.max(1, Math.min(initialScale * scaleFactor, 5)); 
                 updateTransform(false);
             }
         }, { passive: false });
@@ -683,12 +684,11 @@
             const currentTime = new Date().getTime();
             const tapLength = currentTime - lastTap;
             
-            // זיהוי לחיצה כפולה מהירה (פחות מ-300 מילישניות)
             if (tapLength < 300 && tapLength > 0 && e.touches.length === 0) {
                 if (currentScale > 1) {
                     resetZoom();
                 } else {
-                    currentScale = 2.5; // הגדלה ל-250%
+                    currentScale = 2.5; 
                     updateTransform(true);
                 }
             }
