@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>8 פלאי תבל - תלת ממד (גרסה מלאה עם תמונות)</title>
+    <title>8 פלאי תבל - תלת ממד (גרסה מלאה עם תמונות וזום)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -90,6 +90,13 @@
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #475569; border-radius: 10px; }
+
+        /* הגדרות נוספות כדי לאפשר זום חלק בחלון הצף */
+        #modal-image {
+            touch-action: none; /* חוסם את התנהגות הדפדפן כדי לאפשר לסקריפט שלנו להשתלט */
+            transform-origin: center center;
+            will-change: transform;
+        }
     </style>
     
     <script type="importmap">
@@ -106,12 +113,10 @@
     <div id="canvas-container"></div>
     <div id="labels-container" class="absolute top-0 left-0 w-full h-full pointer-events-none z-10"></div>
 
-    <!-- הודעת פתיחה -->
     <div id="intro-overlay" class="absolute top-12 left-1/2 transform -translate-x-1/2 z-30 bg-slate-800/80 backdrop-blur border border-blue-500/30 px-6 py-3 rounded-2xl shadow-2xl pointer-events-none transition-opacity duration-500 text-center w-[90%] md:w-auto">
         <p class="text-base md:text-lg font-medium text-white">סובב את המרחב ולחץ על המודלים כדי לחקור את פלאי תבל</p>
     </div>
 
-    <!-- פאנל צד/תחתון נגלל -->
     <div id="ui-panel" class="p-6 md:p-8 relative">
         
         <button id="close-btn" class="absolute top-6 left-6 p-2 bg-slate-800/80 hover:bg-slate-700 rounded-full transition-colors z-20 backdrop-blur border border-slate-600 focus:outline-none">
@@ -120,17 +125,14 @@
 
         <h1 id="wonder-title" class="text-3xl md:text-4xl font-bold text-blue-400 tracking-tight mb-5 ml-12">כותרת הפלא</h1>
         
-        <!-- Image Container -->
         <div id="image-container" class="relative w-full h-48 md:h-64 bg-slate-800 rounded-xl overflow-hidden flex flex-col items-center justify-center shadow-inner shrink-0 mb-6 transition-all duration-300">
             <div id="image-placeholder" class="flex flex-col items-center justify-center w-full h-full">
                 <svg class="w-12 h-12 text-slate-400 mb-3 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                 <p class="text-slate-300 font-medium text-center px-4">טוען תמונה...</p>
             </div>
-            <!-- הוספתי כאן סמן לחיצה (cursor-pointer) ואפקט ריחוף -->
             <img id="wonder-image" class="absolute inset-0 w-full h-full object-cover hidden cursor-pointer hover:opacity-90 transition-opacity" alt="Wonder Image" title="לחץ להגדלה" />
         </div>
 
-        <!-- Detailed Info List -->
         <div class="flex flex-col gap-5 pb-8 text-slate-200 text-base leading-relaxed">
             
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -205,12 +207,19 @@
         </div>
     </div>
 
-    <!-- מודל החלון הצף (Lightbox) עבור התמונות -->
-    <div id="image-modal" class="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-sm flex items-center justify-center opacity-0 pointer-events-none transition-opacity duration-300 p-4 md:p-8">
-        <button id="modal-close-btn" class="absolute top-6 right-6 md:top-8 md:right-8 p-3 bg-slate-800/80 hover:bg-slate-700 rounded-full transition-colors backdrop-blur border border-slate-600 focus:outline-none z-10 text-white">
+    <div id="image-modal" class="fixed inset-0 z-[100] bg-slate-950/95 backdrop-blur-sm flex items-center justify-center opacity-0 pointer-events-none transition-opacity duration-300 overflow-hidden">
+        
+        <button id="modal-close-btn" class="absolute top-6 right-6 md:top-8 md:right-8 p-3 bg-slate-800/80 hover:bg-slate-700 rounded-full transition-colors backdrop-blur border border-slate-600 focus:outline-none z-[110] text-white">
             <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>
-        <img id="modal-image" class="max-w-full max-h-full object-contain rounded-xl shadow-[0_0_50px_rgba(0,0,0,0.8)] border border-slate-700/50" alt="Full Wonder Image" />
+
+        <div class="absolute inset-0 z-0" id="modal-background-overlay"></div>
+        
+        <img id="modal-image" class="max-w-full max-h-full object-contain rounded-lg shadow-2xl relative z-10" alt="Full Wonder Image" />
+        
+        <div id="zoom-hint" class="absolute bottom-10 left-1/2 transform -translate-x-1/2 bg-black/60 text-white px-4 py-2 rounded-full text-sm font-medium z-[110] pointer-events-none transition-opacity duration-500">
+            ניתן ללחוץ פעמיים או לצבוט להגדלה
+        </div>
     </div>
 
     <script type="module">
@@ -588,32 +597,111 @@
             controls.autoRotate = false;
         };
 
-        // --- לוגיקת החלון הצף (Modal) עבור התמונות ---
+        // --- לוגיקת החלון הצף (Modal) והזום המותאם אישית (Pinch & Pan) ---
         const imageModal = document.getElementById('image-modal');
         const modalImage = document.getElementById('modal-image');
         const modalCloseBtn = document.getElementById('modal-close-btn');
         const wonderImageThumbnail = document.getElementById('wonder-image');
+        const zoomHint = document.getElementById('zoom-hint');
+        const modalBackground = document.getElementById('modal-background-overlay');
 
-        // פתיחת החלון כשלוחצים על התמונה בפאנל
-        wonderImageThumbnail.addEventListener('click', () => {
-            modalImage.src = wonderImageThumbnail.src;
-            imageModal.classList.remove('opacity-0', 'pointer-events-none');
-        });
+        let currentScale = 1;
+        let currentX = 0;
+        let currentY = 0;
+        let startX = 0;
+        let startY = 0;
+        let isDragging = false;
+        let initialPinchDistance = null;
+        let initialScale = 1;
+        let lastTap = 0;
 
-        // פונקציית סגירת החלון
-        const closeModal = () => {
-            imageModal.classList.add('opacity-0', 'pointer-events-none');
-            // מרוקן את התמונה רק אחרי סיום האנימציה כדי שלא תעלם בפתאומיות
-            setTimeout(() => { modalImage.src = ''; }, 300);
+        const updateTransform = (smooth = false) => {
+            modalImage.style.transition = smooth ? 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)' : 'none';
+            modalImage.style.transform = `translate(${currentX}px, ${currentY}px) scale(${currentScale})`;
         };
 
-        // סגירה בלחיצה על כפתור ה-X
+        const resetZoom = () => {
+            currentScale = 1;
+            currentX = 0;
+            currentY = 0;
+            updateTransform(true);
+        };
+
+        wonderImageThumbnail.addEventListener('click', () => {
+            modalImage.src = wonderImageThumbnail.src;
+            resetZoom();
+            imageModal.classList.remove('opacity-0', 'pointer-events-none');
+            zoomHint.style.opacity = '1';
+        });
+
+        const closeModal = () => {
+            imageModal.classList.add('opacity-0', 'pointer-events-none');
+            setTimeout(() => { 
+                modalImage.src = ''; 
+                resetZoom();
+            }, 300);
+        };
+
         modalCloseBtn.addEventListener('click', closeModal);
-        
-        // סגירה בלחיצה על הרקע הכהה מסביב לתמונה
-        imageModal.addEventListener('click', (e) => {
-            if (e.target === imageModal) {
-                closeModal();
+        modalBackground.addEventListener('click', closeModal);
+
+        // מנוע המגע: צביטה, גרירה ולחיצה כפולה
+        modalImage.addEventListener('touchstart', (e) => {
+            zoomHint.style.opacity = '0'; // מעלים את ההדרכה
+            if (e.touches.length === 1) {
+                isDragging = true;
+                startX = e.touches[0].clientX - currentX;
+                startY = e.touches[0].clientY - currentY;
+            } else if (e.touches.length === 2) {
+                isDragging = false;
+                initialPinchDistance = Math.hypot(
+                    e.touches[0].clientX - e.touches[1].clientX,
+                    e.touches[0].clientY - e.touches[1].clientY
+                );
+                initialScale = currentScale;
+            }
+        }, { passive: false });
+
+        modalImage.addEventListener('touchmove', (e) => {
+            e.preventDefault(); // חוסם גלילה של האתר עצמו
+            if (e.touches.length === 1 && isDragging && currentScale > 1) {
+                currentX = e.touches[0].clientX - startX;
+                currentY = e.touches[0].clientY - startY;
+                updateTransform(false);
+            } else if (e.touches.length === 2) {
+                const currentDistance = Math.hypot(
+                    e.touches[0].clientX - e.touches[1].clientX,
+                    e.touches[0].clientY - e.touches[1].clientY
+                );
+                const scaleFactor = currentDistance / initialPinchDistance;
+                currentScale = Math.max(1, Math.min(initialScale * scaleFactor, 5)); // זום מקסימלי x5
+                updateTransform(false);
+            }
+        }, { passive: false });
+
+        modalImage.addEventListener('touchend', (e) => {
+            const currentTime = new Date().getTime();
+            const tapLength = currentTime - lastTap;
+            
+            // זיהוי לחיצה כפולה מהירה (פחות מ-300 מילישניות)
+            if (tapLength < 300 && tapLength > 0 && e.touches.length === 0) {
+                if (currentScale > 1) {
+                    resetZoom();
+                } else {
+                    currentScale = 2.5; // הגדלה ל-250%
+                    updateTransform(true);
+                }
+            }
+            lastTap = currentTime;
+
+            if (e.touches.length < 2) {
+                initialPinchDistance = null;
+            }
+            if (e.touches.length === 0) {
+                isDragging = false;
+                if (currentScale <= 1) {
+                    resetZoom();
+                }
             }
         });
 
@@ -660,5 +748,6 @@
     </script>
 </body>
 </html>
+
 
 ```
